@@ -1,0 +1,389 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Memory Source Manager</title>
+    <style>
+        :root {
+            --bg: #f3f7fb;
+            --surface: #ffffff;
+            --ink: #0f2136;
+            --muted: #5f7085;
+            --accent: #0b8f74;
+            --danger: #c43737;
+            --line: #d9e4ef;
+        }
+        * { box-sizing: border-box; }
+        body {
+            margin: 0;
+            font-family: "Segoe UI", "Tahoma", sans-serif;
+            color: var(--ink);
+            background:
+                radial-gradient(circle at 10% -10%, #d9f2ff 0, transparent 45%),
+                radial-gradient(circle at 90% 0%, #dff7ef 0, transparent 35%),
+                var(--bg);
+            min-height: 100vh;
+        }
+        .shell {
+            max-width: 980px;
+            margin: 32px auto;
+            padding: 0 16px;
+        }
+        .panel {
+            background: var(--surface);
+            border: 1px solid var(--line);
+            border-radius: 16px;
+            box-shadow: 0 12px 28px rgba(15, 33, 54, 0.08);
+            padding: 20px;
+            margin-bottom: 16px;
+        }
+        h1 {
+            margin: 0 0 12px;
+            font-size: 30px;
+            letter-spacing: 0.3px;
+        }
+        p { margin: 0 0 14px; color: var(--muted); }
+        form {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+            gap: 12px;
+            align-items: end;
+        }
+        label {
+            display: block;
+            font-size: 13px;
+            color: var(--muted);
+            margin-bottom: 6px;
+        }
+        input, button {
+            width: 100%;
+            border-radius: 10px;
+            border: 1px solid var(--line);
+            padding: 10px 12px;
+            font: inherit;
+        }
+        input:focus {
+            outline: 2px solid #a9e7d9;
+            border-color: var(--accent);
+        }
+        button {
+            background: var(--accent);
+            color: #fff;
+            font-weight: 600;
+            border: 0;
+            cursor: pointer;
+        }
+        button:hover { filter: brightness(0.95); }
+        button.secondary {
+            background: #e9f0f7;
+            color: var(--ink);
+            border: 1px solid var(--line);
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 6px;
+        }
+        th, td {
+            text-align: left;
+            padding: 10px 8px;
+            border-bottom: 1px solid var(--line);
+            font-size: 14px;
+            vertical-align: top;
+        }
+        th { color: var(--muted); font-weight: 600; }
+        .danger {
+            background: #fdecec;
+            color: var(--danger);
+            border: 1px solid #f6c3c3;
+            padding: 7px 10px;
+            border-radius: 8px;
+            cursor: pointer;
+            width: auto;
+        }
+        .status {
+            margin-top: 10px;
+            min-height: 20px;
+            font-size: 14px;
+            color: var(--muted);
+        }
+        .dropzone {
+            border: 2px dashed #9bc9bc;
+            border-radius: 12px;
+            padding: 18px 12px;
+            text-align: center;
+            background: #f8fcfa;
+            color: #385d53;
+            cursor: pointer;
+            transition: border-color 0.15s ease, background-color 0.15s ease;
+        }
+        .dropzone.active {
+            border-color: var(--accent);
+            background: #eefaf5;
+        }
+        .file-list {
+            margin-top: 8px;
+            font-size: 13px;
+            color: var(--muted);
+            max-height: 72px;
+            overflow: auto;
+        }
+        .floating-note {
+            color: #7a889a;
+            font-size: 12px;
+        }
+        @media (max-width: 640px) {
+            h1 { font-size: 24px; }
+            .panel { padding: 16px; }
+            th:nth-child(3), td:nth-child(3) { display: none; }
+        }
+    </style>
+</head>
+<body>
+    <div class="shell">
+        <section class="panel">
+            <h1>Source Manager</h1>
+            <p>Upload PDFs, docs, code, and other files into a context, then remove any source when needed.</p>
+            <form id="upload-form">
+                <div>
+                    <label for="apiKey">API Key</label>
+                    <input id="apiKey" type="password" placeholder="Paste your MEMORY_API_KEY" required />
+                </div>
+                <div>
+                    <label for="contextId">Context ID (example: os)</label>
+                    <input id="contextId" type="text" placeholder="os" required />
+                </div>
+                <div>
+                    <label for="sourceFile">Choose File(s)</label>
+                    <input id="sourceFile" type="file" multiple />
+                    <div id="dropZone" class="dropzone">Drag and drop files here, or click this area</div>
+                    <div id="selected-files" class="file-list">No files selected.</div>
+                </div>
+                <div>
+                    <button type="submit">Upload Sources</button>
+                </div>
+            </form>
+            <div class="status" id="upload-status"></div>
+        </section>
+
+        <section class="panel">
+            <form id="list-form">
+                <div>
+                    <label for="listContext">Context ID to view sources</label>
+                    <input id="listContext" type="text" placeholder="os" required />
+                </div>
+                <div>
+                    <button type="submit" class="secondary">Refresh Sources</button>
+                </div>
+            </form>
+            <div class="status" id="list-status"></div>
+            <table>
+                <thead>
+                    <tr>
+                        <th>Filename</th>
+                        <th>Type</th>
+                        <th>Uploaded</th>
+                        <th>Action</th>
+                    </tr>
+                </thead>
+                <tbody id="source-body"></tbody>
+            </table>
+        </section>
+    </div>
+
+    <script>
+        const uploadForm = document.getElementById("upload-form");
+        const listForm = document.getElementById("list-form");
+        const uploadStatus = document.getElementById("upload-status");
+        const listStatus = document.getElementById("list-status");
+        const sourceBody = document.getElementById("source-body");
+        const dropZone = document.getElementById("dropZone");
+        const sourceFileInput = document.getElementById("sourceFile");
+        const selectedFilesLabel = document.getElementById("selected-files");
+        const apiKeyInput = document.getElementById("apiKey");
+        const API_KEY_STORAGE_KEY = "memory-mcp-api-key";
+        let pendingFiles = [];
+
+        apiKeyInput.value = localStorage.getItem(API_KEY_STORAGE_KEY) || "";
+        apiKeyInput.addEventListener("change", () => {
+            localStorage.setItem(API_KEY_STORAGE_KEY, apiKeyInput.value.trim());
+        });
+
+        function getApiKey() {
+            const key = apiKeyInput.value.trim();
+            if (key) {
+                localStorage.setItem(API_KEY_STORAGE_KEY, key);
+            }
+            return key;
+        }
+
+        function updateSelectedFilesLabel() {
+            if (!pendingFiles.length) {
+                selectedFilesLabel.textContent = "No files selected.";
+                return;
+            }
+            const names = pendingFiles.slice(0, 6).map((f) => f.name).join(", ");
+            const remainder = pendingFiles.length > 6 ? ` +${pendingFiles.length - 6} more` : "";
+            selectedFilesLabel.textContent = `${pendingFiles.length} file(s): ${names}${remainder}`;
+        }
+
+        function addFiles(fileList) {
+            const all = [...pendingFiles, ...Array.from(fileList)];
+            const seen = new Set();
+            pendingFiles = all.filter((f) => {
+                if (seen.has(f.name)) return false;
+                seen.add(f.name);
+                return true;
+            });
+            console.log("selected files", pendingFiles.map((f) => f.name));
+            updateSelectedFilesLabel();
+        }
+
+        sourceFileInput.addEventListener("change", () => {
+            addFiles(sourceFileInput.files);
+        });
+
+        dropZone.addEventListener("click", () => sourceFileInput.click());
+        dropZone.addEventListener("dragover", (event) => {
+            event.preventDefault();
+            dropZone.classList.add("active");
+        });
+        dropZone.addEventListener("dragleave", () => {
+            dropZone.classList.remove("active");
+        });
+        dropZone.addEventListener("drop", (event) => {
+            event.preventDefault();
+            dropZone.classList.remove("active");
+            if (event.dataTransfer?.files?.length) {
+                addFiles(event.dataTransfer.files);
+            }
+        });
+
+        async function refreshList() {
+            const apiKey = getApiKey();
+            const contextId = document.getElementById("listContext").value.trim() || document.getElementById("contextId").value.trim();
+
+            if (!apiKey) {
+                listStatus.textContent = "Enter your API key first.";
+                return;
+            }
+            if (!contextId) {
+                listStatus.textContent = "Enter context ID first.";
+                return;
+            }
+
+            listStatus.textContent = "Loading sources...";
+            const res = await fetch(`/api/sources/${encodeURIComponent(contextId)}`, {
+                headers: { "x-api-key": apiKey }
+            });
+            const payload = await res.json();
+
+            if (!res.ok) {
+                listStatus.textContent = payload.error || "Failed to load sources.";
+                return;
+            }
+
+            sourceBody.innerHTML = "";
+            if (!payload.files.length) {
+                listStatus.textContent = "No sources found in this context.";
+                return;
+            }
+
+            for (const item of payload.files) {
+                const row = document.createElement("tr");
+                row.innerHTML = `
+                    <td><a href="${item.cloudinary_url}" target="_blank" rel="noopener">${item.filename}</a></td>
+                    <td>${item.file_type || "unknown"}</td>
+                    <td>${item.uploaded_at || "-"}</td>
+                    <td><button class="danger" data-file-id="${item.file_id}" data-context="${contextId}">Remove</button></td>
+                `;
+                sourceBody.appendChild(row);
+            }
+
+            listStatus.textContent = `Loaded ${payload.files.length} source(s).`;
+        }
+
+        uploadForm.addEventListener("submit", async (event) => {
+            event.preventDefault();
+            const apiKey = getApiKey();
+            const contextId = document.getElementById("contextId").value.trim();
+            if (!apiKey) {
+                uploadStatus.textContent = "Enter your API key first.";
+                return;
+            }
+            if (!pendingFiles.length) {
+                uploadStatus.textContent = "Choose one or more files first.";
+                return;
+            }
+
+            const formData = new FormData();
+            formData.append("context_id", contextId);
+            for (const file of pendingFiles) {
+                formData.append("files", file);
+            }
+            uploadStatus.textContent = `Uploading ${pendingFiles.length} source(s)...`;
+
+            const res = await fetch("/api/sources/upload", {
+                method: "POST",
+                headers: { "x-api-key": apiKey },
+                body: formData,
+            });
+
+            const payload = await res.json();
+            if (!res.ok) {
+                uploadStatus.textContent = payload.error || "Upload failed.";
+                return;
+            }
+
+            const ok = payload.indexed_count || 0;
+            const failed = payload.failed_count || 0;
+            uploadStatus.textContent = failed
+                ? `Uploaded ${ok} source(s), ${failed} failed.`
+                : `Uploaded ${ok} source(s) successfully.`;
+            pendingFiles = [];
+            sourceFileInput.value = "";
+            updateSelectedFilesLabel();
+            document.getElementById("listContext").value = contextId;
+            await refreshList();
+        });
+
+        listForm.addEventListener("submit", async (event) => {
+            event.preventDefault();
+            await refreshList();
+        });
+
+        sourceBody.addEventListener("click", async (event) => {
+            const target = event.target;
+            if (!target.matches("button.danger")) {
+                return;
+            }
+
+            const apiKey = getApiKey();
+            if (!apiKey) {
+                listStatus.textContent = "Enter your API key first.";
+                return;
+            }
+            const fileId = target.getAttribute("data-file-id");
+            const contextId = target.getAttribute("data-context");
+            if (!confirm("Remove this source from storage and index?")) {
+                return;
+            }
+
+            const res = await fetch(`/api/sources/${encodeURIComponent(contextId)}/${encodeURIComponent(fileId)}`, {
+                method: "DELETE",
+                headers: { "x-api-key": apiKey },
+            });
+            const payload = await res.json();
+
+            if (!res.ok) {
+                listStatus.textContent = payload.error || "Delete failed.";
+                return;
+            }
+
+            listStatus.textContent = `Removed ${payload.filename}.`;
+            await refreshList();
+        });
+    </script>
+</body>
+</html>
