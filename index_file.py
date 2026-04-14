@@ -7,7 +7,7 @@ import uuid
 from datetime import datetime, timezone
 from pathlib import Path
 
-# loading env here to keep this script standalone
+# keep this script standalone
 from dotenv import load_dotenv
 load_dotenv()
 
@@ -18,9 +18,9 @@ from config import (
 )
 import firebase_client as db
 
-# extensions i care about right now
-_IMAGE_EXTS   = {".jpg", ".jpeg", ".png", ".gif", ".webp", ".bmp", ".tiff", ".svg"}
-_PDF_EXTS     = {".pdf"}
+# common file types I use here
+_IMAGE_EXTS = {".jpg", ".jpeg", ".png", ".gif", ".webp", ".bmp", ".tiff", ".svg"}
+_PDF_EXTS = {".pdf"}
 _TEXT_EXTS    = {
     ".txt", ".md", ".py", ".js", ".ts", ".jsx", ".tsx",
     ".html", ".css", ".json", ".yaml", ".yml", ".toml",
@@ -67,7 +67,7 @@ def _extract_text(file_path: Path) -> str:
     ext = file_path.suffix.lower()
 
     if ext in _IMAGE_EXTS:
-        return ""  # Images: URL stored only
+        return ""
 
     if ext in _PDF_EXTS:
         try:
@@ -80,7 +80,6 @@ def _extract_text(file_path: Path) -> str:
             print(f"WARNING: PDF text extraction failed: {exc}")
             return ""
 
-    # Text / code files
     try:
         return file_path.read_text(encoding="utf-8")
     except UnicodeDecodeError:
@@ -121,8 +120,7 @@ def index_file(context_id: str, file_path_str: str) -> None:
     char_count = len(extracted_text)
     print(f"  ✓ Extracted {char_count:,} characters")
 
-    # TODO: Firestore doc limit is 1MB, large PDFs can fail here if text is huge.
-    # this CLI still stores extracted text in one doc unlike the server chunk path.
+    # TODO: Firestore doc limit is still the annoying part for huge PDFs.
     file_id   = str(uuid.uuid4())
     file_doc  = {
         "file_id":              file_id,

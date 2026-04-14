@@ -1,8 +1,4 @@
-﻿"""Memory MCP server.
-
-Built this in chunks over a few late nights, so this file has routes + tools +
-helpers in one place for now.
-"""
+﻿"""Memory MCP server."""
 
 import io
 import hmac
@@ -66,19 +62,14 @@ mcp = FastMCP(
     host=HOST,
     port=PORT,
     instructions=(
-        "Persistent memory store for organizing conversations by topic/project. "
-        "Use switch_context when a /SHORTCUT is detected (e.g., /OS, /React). "
-        "Use register_context to create new contexts. "
-        "Use list_contexts to show all available shortcuts. "
-        "Use save_conversation at session end to persist the conversation. "
-        "Use search_conversations to recall past sessions by keyword. "
-        "Supports Claude, ChatGPT, and any MCP-compatible chatbot."
+        "Memory store for conversations, files, and context shortcuts. "
+        "Use switch_context for /SHORTCUT lookups, register_context for new ones, "
+        "list_contexts for the current set, save_conversation to persist a chat, "
+        "and search_conversations to find older sessions."
     ),
 )
 
-# quick auth check, may tighten this later
-
-def _check_auth(api_key: str | None) -> bool:
+def _api_key_ok(api_key: str | None) -> bool:
     if not MEMORY_API_KEY:
         log.error("MEMORY_API_KEY is not configured")
         return False
@@ -199,7 +190,7 @@ def _delete_from_cloudinary(public_id: str, resource_type: str | None) -> bool:
             continue
     return False
 
-    # tiny routes first
+    # small stuff first
 
 @mcp.custom_route("/health", methods=["GET"])
 async def health(request: Request) -> JSONResponse:
@@ -212,13 +203,14 @@ async def health(request: Request) -> JSONResponse:
 
 @mcp.custom_route("/sources", methods=["GET"])
 async def sources_page(request: Request) -> HTMLResponse:
+    # TODO: split this into static assets if the page grows again.
     return HTMLResponse(_load_template("sources.html"))
 
 
 @mcp.custom_route("/api/sources/upload", methods=["POST"])
 async def upload_source(request: Request) -> JSONResponse:
     api_key = _request_api_key(request)
-    if not _check_auth(api_key):
+    if not _api_key_ok(api_key):
         return JSONResponse({"error": "Unauthorized"}, status_code=401)
 
     form = await request.form()
@@ -310,7 +302,7 @@ async def upload_source(request: Request) -> JSONResponse:
 @mcp.custom_route("/api/sources/{context_id}", methods=["GET"])
 async def list_sources(request: Request) -> JSONResponse:
     api_key = _request_api_key(request)
-    if not _check_auth(api_key):
+    if not _api_key_ok(api_key):
         return JSONResponse({"error": "Unauthorized"}, status_code=401)
 
     context_id = _normalize_context_id(request.path_params.get("context_id", ""))
@@ -328,7 +320,7 @@ async def list_sources(request: Request) -> JSONResponse:
 @mcp.custom_route("/api/sources/{context_id}/{file_id}", methods=["DELETE"])
 async def delete_source(request: Request) -> JSONResponse:
     api_key = _request_api_key(request)
-    if not _check_auth(api_key):
+    if not _api_key_ok(api_key):
         return JSONResponse({"error": "Unauthorized"}, status_code=401)
 
     context_id = _normalize_context_id(request.path_params.get("context_id", ""))
@@ -356,93 +348,57 @@ async def delete_source(request: Request) -> JSONResponse:
         log.error("delete_source failed: %s", exc)
         return JSONResponse({"error": str(exc)}, status_code=500)
 
-# mcp tools below
+# MCP tools
 
 @mcp.tool(
-    description=(
-        "Switch to a context by its shortcut (e.g. '/OS', '/React'). "
-        "Returns context metadata, the last 5 conversation summaries, "
-        "and the full file index for that context. "
-        "Call this immediately when a /SHORTCUT is detected in the user's message."
-    )
+    description="Load a context by shortcut and return recent files and chats."
 )
 def switch_context(shortcut: str, ctx: Context) -> dict:
-    """Load a shortcut and return recent stuff."""
-    if not _check_auth(_tool_api_key(ctx)):
+    if not _api_key_ok(_tool_api_key(ctx)):
         return {"error": "Unauthorized"}
     log.info("switch_context -> %s", shortcut)
-    try:
-        return db.switch_context(shortcut)
-    except Exception as exc:
-        log.error("switch_context failed: %s", exc)
-        return {"error": str(exc)}
+    return db.switch_context(shortcut)
 
 
 @mcp.tool(
-    description=(
-        "Register a brand-new context / shortcut. "
-        "Call this when the user types a /SHORTCUT that doesn't exist yet "
-        "and confirms they want to create it. "
-        "shortcut should be the raw shortcut e.g. '/OS' or 'OS'. "
-        "name is a human-readable label. "
-        "description explains what this context is for."
-    )
+    description="Create a new shortcut with a name and short description."
 )
 def register_context(shortcut: str, name: str, description: str, ctx: Context) -> dict:
-    if not _check_auth(_tool_api_key(ctx)):
+    if not _api_key_ok(_tool_api_key(ctx)):
         return {"error": "Unauthorized"}
     if not shortcut or not name:
         return {"error": "shortcut and name are required"}
     log.info("register_context -> shortcut=%s name=%s", shortcut, name)
-    try:
-        return db.register_context(shortcut, name, description)
-    except Exception as exc:
-        log.error("register_context failed: %s", exc)
-        return {"error": str(exc)}
+    return db.register_context(shortcut, name, description)
 
 
 @mcp.tool(
-    description=(
-        "List all registered contexts with their shortcuts, names, and descriptions. "
-        "Call this when the user asks 'what contexts do I have' or "
-        "'show me my shortcuts'."
-    )
+    description="List the saved contexts and their shortcuts."
 )
 def list_contexts(ctx: Context) -> dict:
-    if not _check_auth(_tool_api_key(ctx)):
+    if not _api_key_ok(_tool_api_key(ctx)):
         return {"error": "Unauthorized"}
     log.info("list_contexts called")
-    try:
-        contexts = db.list_contexts()
-        return {"contexts": contexts, "count": len(contexts)}
-    except Exception as exc:
-        log.error("list_contexts failed: %s", exc)
-        return {"error": str(exc)}
+    contexts = db.list_contexts()
+    return {"contexts": contexts, "count": len(contexts)}
 
 
-# phase 2 memory writes
+# memory writes
 
 @mcp.tool(
-    description=(
-        "Save the current conversation to memory for a given context. "
-        "Pass context_id (e.g. 'os') and messages as a list of "
-        "{role, content} dicts. "
-        "The server auto-generates title, summary, and tags using NVIDIA NIM. "
-        "Call this when the user says 'done', 'bye', 'save', or ends the session."
-    )
+    description="Save a conversation for a context and build metadata for it."
 )
 def save_conversation(
     context_id: str,
     messages: list[dict],
     ctx: Context,
 ) -> dict:
-    if not _check_auth(_tool_api_key(ctx)):
+    if not _api_key_ok(_tool_api_key(ctx)):
         return {"error": "Unauthorized"}
     if not context_id:
         return {"error": "context_id is required"}
     if not messages:
         return {"error": "messages list is required and must not be empty"}
-    # idk if this edge case matters but keeping it
     log.info("save_conversation -> context=%s messages=%d", context_id, len(messages))
     try:
         metadata = summariser.generate_metadata(messages)
@@ -453,32 +409,19 @@ def save_conversation(
 
 
 @mcp.tool(
-    description=(
-        "Retrieve a specific conversation by its ID. "
-        "Returns the full conversation including all messages. "
-        "Use get_conversation when the user asks to review a past session."
-    )
+    description="Fetch one conversation by ID, including messages."
 )
 def get_conversation(context_id: str, conv_id: str, ctx: Context) -> dict:
-    if not _check_auth(_tool_api_key(ctx)):
+    if not _api_key_ok(_tool_api_key(ctx)):
         return {"error": "Unauthorized"}
     if not context_id or not conv_id:
         return {"error": "context_id and conv_id are required"}
     log.info("get_conversation -> context=%s conv=%s", context_id, conv_id)
-    try:
-        return db.get_conversation(context_id, conv_id)
-    except Exception as exc:
-        log.error("get_conversation failed: %s", exc)
-        return {"error": str(exc)}
+    return db.get_conversation(context_id, conv_id)
 
 
 @mcp.tool(
-    description=(
-        "Update an existing conversation â€” append new messages or update "
-        "its title, summary, or tags. "
-        "Use update_conversation when continuing a prior session instead of saving a new one. "
-        "All update fields are optional; only provided fields are written."
-    )
+    description="Patch an existing conversation with messages, title, summary, or tags."
 )
 def update_conversation(
     context_id: str,
@@ -489,7 +432,7 @@ def update_conversation(
     new_tags: list[str] | None = None,
     new_title: str | None = None,
 ) -> dict:
-    if not _check_auth(_tool_api_key(ctx)):
+    if not _api_key_ok(_tool_api_key(ctx)):
         return {"error": "Unauthorized"}
     if not context_id or not conv_id:
         return {"error": "context_id and conv_id are required"}
@@ -506,12 +449,7 @@ def update_conversation(
 # search stuff
 
 @mcp.tool(
-    description=(
-        "Search past conversations in a context by keywords. "
-        "Searches tags (Firestore index) first, then falls back to summary substring. "
-        "Returns lightweight results: conv_id, title, summary, tags, updated_at. "
-        "Call at session start after switch_context to surface relevant past sessions."
-    )
+    description="Search a context by keywords and return lightweight matches."
 )
 def search_conversations(
     context_id: str,
@@ -519,7 +457,7 @@ def search_conversations(
     ctx: Context,
     limit: int = 10,
 ) -> dict:
-    if not _check_auth(_tool_api_key(ctx)):
+    if not _api_key_ok(_tool_api_key(ctx)):
         return {"error": "Unauthorized"}
     if not context_id or not keywords:
         return {"error": "context_id and keywords are required"}
@@ -535,45 +473,28 @@ def search_conversations(
 # file tools
 
 @mcp.tool(
-    description=(
-        "List all indexed files for a context. "
-        "Returns metadata only (no extracted text): "
-        "file_id, filename, file_type, cloudinary_url, uploaded_at. "
-        "Called automatically after switch_context if files exist."
-    )
+    description="List indexed files for a context."
 )
 def list_files(context_id: str, ctx: Context) -> dict:
-    if not _check_auth(_tool_api_key(ctx)):
+    if not _api_key_ok(_tool_api_key(ctx)):
         return {"error": "Unauthorized"}
     if not context_id:
         return {"error": "context_id is required"}
     log.info("list_files -> context=%s", context_id)
-    try:
-        files = db.list_files(context_id)
-        return {"files": files, "count": len(files)}
-    except Exception as exc:
-        log.error("list_files failed: %s", exc)
-        return {"error": str(exc)}
+    files = db.list_files(context_id)
+    return {"files": files, "count": len(files)}
 
 
 @mcp.tool(
-    description=(
-        "Retrieve a file's extracted text content and Cloudinary URL. "
-        "Use get_file_content when the user asks a question about a specific file. "
-        "The extracted_text field contains the full indexable text."
-    )
+    description="Fetch a file record plus its extracted text."
 )
 def get_file_content(context_id: str, file_id: str, ctx: Context) -> dict:
-    if not _check_auth(_tool_api_key(ctx)):
+    if not _api_key_ok(_tool_api_key(ctx)):
         return {"error": "Unauthorized"}
     if not context_id or not file_id:
         return {"error": "context_id and file_id are required"}
     log.info("get_file_content -> context=%s file=%s", context_id, file_id)
-    try:
-        return db.get_file_content(context_id, file_id)
-    except Exception as exc:
-        log.error("get_file_content failed: %s", exc)
-        return {"error": str(exc)}
+    return db.get_file_content(context_id, file_id)
 
 
 # boot it

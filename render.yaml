@@ -10,92 +10,25 @@ services:
       - key: MEMORY_API_KEY
         scope: run
         description: "REQUIRED: Secret API key for all MCP requests (minimum 32 characters)"
-      
-      # ── Database (Choose One) ──────────────────────────────────────
       - key: FIREBASE_SERVICE_ACCOUNT_KEY
         scope: run
         description: "OPTIONAL: Firebase service account JSON (if using Firebase/Firestore)"
-      
-      - key: DB_CONNECTION_STRING
-        scope: run
-        description: "OPTIONAL: Database connection string (MongoDB, PostgreSQL, etc.)"
-      
-      - key: DB_TYPE
-        scope: run
-        description: "OPTIONAL: Database type (e.g., mongodb, postgresql)"
-      
-      # ── File Storage (Choose One) ──────────────────────────────────
       - key: CLOUDINARY_CLOUD_NAME
         scope: run
         description: "OPTIONAL: Cloudinary cloud name (if using Cloudinary for file storage)"
-      
       - key: CLOUDINARY_API_KEY
         scope: run
         description: "OPTIONAL: Cloudinary API key"
-      
       - key: CLOUDINARY_API_SECRET
         scope: run
         description: "OPTIONAL: Cloudinary API secret"
-      
-      - key: AWS_ACCESS_KEY_ID
-        scope: run
-        description: "OPTIONAL: AWS access key (if using S3 for file storage)"
-      
-      - key: AWS_SECRET_ACCESS_KEY
-        scope: run
-        description: "OPTIONAL: AWS secret key"
-      
-      - key: AWS_BUCKET_NAME
-        scope: run
-        description: "OPTIONAL: AWS S3 bucket name"
-      
-      - key: AZURE_STORAGE_ACCOUNT
-        scope: run
-        description: "OPTIONAL: Azure storage account (if using Azure Blob Storage)"
-      
-      - key: AZURE_STORAGE_KEY
-        scope: run
-        description: "OPTIONAL: Azure storage key"
-      
-      - key: GCS_PROJECT_ID
-        scope: run
-        description: "OPTIONAL: Google Cloud project ID (if using GCS)"
-      
-      - key: GCS_BUCKET_NAME
-        scope: run
-        description: "OPTIONAL: Google Cloud Storage bucket name"
-      
-      - key: GCS_CREDENTIALS_JSON
-        scope: run
-        description: "OPTIONAL: Google Cloud service account JSON path"
-      
-      # ── LLM/AI (Optional) ──────────────────────────────────────────
       - key: NVIDIA_API_KEY
         scope: run
         description: "OPTIONAL: NVIDIA API key (for summarization)"
-      
-      - key: OPENAI_API_KEY
-        scope: run
-        description: "OPTIONAL: OpenAI API key (alternative for summarization)"
-      
-      - key: ANTHROPIC_API_KEY
-        scope: run
-        description: "OPTIONAL: Anthropic API key (alternative for summarization)"
-      
-      - key: LLM_PROVIDER
-        scope: run
-        description: "OPTIONAL: Custom LLM provider name"
-      
-      - key: LLM_API_KEY
-        scope: run
-        description: "OPTIONAL: Custom LLM API key"
-      
-      # ── Server Config ──────────────────────────────────────────────
       - key: HOST
         scope: run
         value: "0.0.0.0"
         description: "Server host (all interfaces)"
-      
       - key: PORT
         scope: run
         value: "8000"

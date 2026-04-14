@@ -6,7 +6,7 @@
     <title>Memory Source Manager</title>
     <style>
         :root {
-            --bg: #f3f7fb;
+            --bg: #eef2f6;
             --surface: #ffffff;
             --ink: #0f2136;
             --muted: #5f7085;
@@ -19,10 +19,7 @@
             margin: 0;
             font-family: "Segoe UI", "Tahoma", sans-serif;
             color: var(--ink);
-            background:
-                radial-gradient(circle at 10% -10%, #d9f2ff 0, transparent 45%),
-                radial-gradient(circle at 90% 0%, #dff7ef 0, transparent 35%),
-                var(--bg);
+            background: var(--bg);
             min-height: 100vh;
         }
         .shell {
@@ -34,7 +31,7 @@
             background: var(--surface);
             border: 1px solid var(--line);
             border-radius: 16px;
-            box-shadow: 0 12px 28px rgba(15, 33, 54, 0.08);
+            box-shadow: 0 10px 22px rgba(15, 33, 54, 0.06);
             padding: 20px;
             margin-bottom: 16px;
         }
@@ -116,7 +113,6 @@
             background: #f8fcfa;
             color: #385d53;
             cursor: pointer;
-            transition: border-color 0.15s ease, background-color 0.15s ease;
         }
         .dropzone.active {
             border-color: var(--accent);
@@ -236,7 +232,6 @@
                 seen.add(f.name);
                 return true;
             });
-            console.log("selected files", pendingFiles.map((f) => f.name));
             updateSelectedFilesLabel();
         }
 

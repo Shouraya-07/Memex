@@ -1,44 +1,37 @@
 # Memex
 
-I built this because I was tired of losing context between Claude sessions.
+Small MCP memory server for keeping contexts, chats, and uploaded sources together.
 
-It is a small MCP memory server that lets me:
-- switch contexts with shortcuts like `/os` and `/react`
-- save and search old conversation threads
-- upload docs/PDFs as context files
+## Setup
 
-It works with Claude, ChatGPT, and other MCP clients.
-
-## Quick Start
-
-1. Clone the repo and make a virtual env.
-2. Install deps:
+1. Create a virtual environment and install dependencies.
    ```bash
    pip install -r requirements.txt
    ```
-3. Copy `.env.example` to `.env` and set at least:
+2. Copy `.env.example` to `.env` and fill in:
    - `MEMORY_API_KEY`
    - `FIREBASE_SERVICE_ACCOUNT_KEY`
-   - Cloudinary keys if you want file uploads
-4. Run:
+   - Cloudinary keys if you want uploads
+3. Run:
    ```bash
    python server.py
    ```
-5. Open:
-   - `http://localhost:8000/health`
-   - `http://localhost:8000/sources`
 
-## Deploy
+## Render
 
-I deploy this on Render with:
-- build command: `pip install -r requirements.txt`
-- start command: `uvicorn server:mcp --host 0.0.0.0 --port $PORT`
+Build command: `pip install -r requirements.txt`
+
+Start command: `uvicorn server:mcp --host 0.0.0.0 --port $PORT`
+
+## Services
+
+Firebase stores the contexts, conversations, and file index. Cloudinary handles uploads for the source manager.
 
 ## Notes
 
 - API auth uses `MEMORY_API_KEY`.
 - Tool auth reads from MCP metadata (`_meta.api_key`).
-- For HTTP routes (`/sources`, upload/list/delete), send `x-api-key`.
+- HTTP routes under `/sources` use `x-api-key`.
 
 ## Tools
 
